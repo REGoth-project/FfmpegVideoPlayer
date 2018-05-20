@@ -17,9 +17,7 @@
 namespace SDLWindow
 {
     void open(uint32_t width, uint32_t height);
-    void displayPixels(const uint8_t *pYplane, size_t Ypitch,
-                       const uint8_t *pUplane, size_t Upitch,
-                       const uint8_t *pVplane, size_t Vpitch);
+    void displayPixels(const uint8_t* pRGB, size_t pitch);
     void update();
 }
 

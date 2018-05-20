@@ -18,6 +18,7 @@
 #ifdef HAS_FFMPEG
 
 extern "C" {
+    #include <libswscale/swscale.h>
     #include <libavcodec/avcodec.h>
     #include <libavformat/avformat.h>
 }
@@ -27,13 +28,21 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <vector>
 
 using namespace VideoRead;
 
 // print out the steps and errors
 static void logging(const char *fmt, ...);
 // decode packets into frames
-static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, VideoFrameCallback onVideoFrame);
+static int decode_packet(struct SwsContext* pSwsContext,
+                         AVPacket *pPacket,
+                         AVCodecContext *pCodecContext,
+                         AVFrame *pFrame,
+                         VideoFrameCallback onVideoFrame);
+static void decode_yuv_and_send_to_client(struct SwsContext* pSwsContext,
+                                          AVFrame* pFrame,
+                                          VideoFrameCallback onVideoFrame);
 
 void VideoRead::playVideo(const std::string& file, PlayerSettings playerSettings)
 {
@@ -162,6 +171,12 @@ void VideoRead::playVideo(const std::string& file, PlayerSettings playerSettings
     if (!pPacket)
         throw new std::runtime_error("failed to allocated memory for AVPacket");
 
+    struct SwsContext* pSwsContext = sws_getContext(videoInfo.width, videoInfo.height, pCodecContext->pix_fmt,
+                                                    videoInfo.width, videoInfo.height, AV_PIX_FMT_RGB24,
+                                                    0, 0, 0, 0);
+    if (!pSwsContext)
+        throw new std::runtime_error("Failed to create SwsContext");
+
     playerSettings.onVideoInit(videoInfo);
 
     int response = 0;
@@ -173,7 +188,11 @@ void VideoRead::playVideo(const std::string& file, PlayerSettings playerSettings
         // if it's the video stream
         if (pPacket->stream_index == video_stream_index) {
             logging("AVPacket->pts %" PRId64, pPacket->pts);
-            response = decode_packet(pPacket, pCodecContext, pFrame, playerSettings.onVideoFrame);
+            response = decode_packet(pSwsContext,
+                                     pPacket,
+                                     pCodecContext,
+                                     pFrame,
+                                     playerSettings.onVideoFrame);
             if (response < 0)
                 break;
             // stop it, otherwise we'll be saving hundreds of frames
@@ -204,7 +223,11 @@ static void logging(const char *fmt, ...)
     fprintf( stderr, "\n" );
 }
 
-static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, VideoFrameCallback onVideoFrame)
+static int decode_packet(struct SwsContext* pSwsContext,
+                         AVPacket *pPacket,
+                         AVCodecContext *pCodecContext,
+                         AVFrame *pFrame,
+                         VideoFrameCallback onVideoFrame)
 {
     // Supply raw packet data as input to a decoder
     // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
@@ -238,21 +261,36 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
                     pFrame->coded_picture_number
             );
 
-            VideoFrameData data;
-            data.pYplane = pFrame->data[0];
-            data.pUplane = pFrame->data[1];
-            data.pVplane = pFrame->data[2];
-
-            data.Ypitch = (size_t)pFrame->linesize[0];
-            data.Upitch = (size_t)pFrame->linesize[1];
-            data.Vpitch = (size_t)pFrame->linesize[2];
-
-            onVideoFrame(data);
+            decode_yuv_and_send_to_client(pSwsContext, pFrame, onVideoFrame);
 
             av_frame_unref(pFrame);
         }
     }
     return 0;
+}
+
+static void decode_yuv_and_send_to_client(struct SwsContext* pSwsContext,
+                                          AVFrame* pFrame,
+                                          VideoFrameCallback onVideoFrame)
+{
+    std::vector<uint8_t> destinationRGB((size_t)(3 * pFrame->width * pFrame->height));
+
+    uint8_t* outData[] = { &destinationRGB[0] };
+    int outLinesize[] = { 3 * pFrame->width };
+
+    sws_scale(pSwsContext,
+              pFrame->data,
+              pFrame->linesize,
+              0,
+              pFrame->height,
+              outData,
+              outLinesize);
+
+    VideoFrameData data;
+    data.pitch = 3 * (size_t)pFrame->width;
+    data.rgb = std::move(destinationRGB);
+
+    onVideoFrame(data);
 }
 
 bool VideoRead::isVideoPlaybackAvailable()

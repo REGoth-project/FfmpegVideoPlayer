@@ -32,6 +32,8 @@ target_link_libraries(ffmpeg_video_player ${FFMPEG_LIBRARIES})
 
 include_directories(include)
 
+# set(FFMPEG_VIDEO_PLAYER_BUILD_EXAMPLES on)
+
 # Examples
 if(FFMPEG_VIDEO_PLAYER_BUILD_EXAMPLES)
 

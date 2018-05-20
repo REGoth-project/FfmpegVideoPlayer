@@ -5,14 +5,12 @@
 int main(int argc, const char *argv[]) {
 
     VideoRead::PlayerSettings playerSettings = {
-            .onVideoInit = [](VideoRead::VideoInfo info) {
+            .onVideoInit = [](const VideoRead::VideoInfo& info) {
                 SDLWindow::open(info.width, info.height);
             },
 
-            .onVideoFrame = [](VideoRead::VideoFrameData data) {
-                SDLWindow::displayPixels(data.pYplane, data.Ypitch,
-                                         data.pUplane, data.Upitch,
-                                         data.pVplane, data.Vpitch);
+            .onVideoFrame = [](const VideoRead::VideoFrameData& data) {
+                SDLWindow::displayPixels(data.rgb.data(), data.pitch);
 
                 SDLWindow::update();
             },

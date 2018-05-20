@@ -5,6 +5,7 @@
 #pragma once
 
 #include <functional>
+#include <vector>
 
 namespace VideoRead
 {
@@ -18,18 +19,19 @@ namespace VideoRead
 
     struct VideoFrameData
     {
-        const uint8_t* pYplane;
-        size_t Ypitch;
+        /**
+         * RGB24 frame data
+         */
+        std::vector<uint8_t> rgb;
 
-        const uint8_t* pUplane;
-        size_t Upitch;
-
-        const uint8_t* pVplane;
-        size_t Vpitch;
+        /**
+         * Row size, in bytes
+         */
+        size_t pitch;
     };
 
-    typedef std::function<void(VideoInfo)> VideoInitCallback;
-    typedef std::function<void(VideoFrameData)> VideoFrameCallback;
+    typedef std::function<void(const VideoInfo&)> VideoInitCallback;
+    typedef std::function<void(const VideoFrameData&)> VideoFrameCallback;
 
     struct PlayerSettings
     {

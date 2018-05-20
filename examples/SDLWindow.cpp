@@ -34,7 +34,7 @@ void SDLWindow::open(uint32_t width, uint32_t height)
 
     module.sdl.pRenderer = SDL_CreateRenderer(module.sdl.pWindow, -1, 0);
     module.sdl.pTexture = SDL_CreateTexture(module.sdl.pRenderer,
-                                            SDL_PIXELFORMAT_YV12,
+                                            SDL_PIXELFORMAT_RGB24,
                                             SDL_TEXTUREACCESS_STATIC,
                                             width,
                                             height);
@@ -55,14 +55,9 @@ void SDLWindow::update()
     SDL_Delay(1000/30);
 }
 
-void SDLWindow::displayPixels(const uint8_t* pYplane, size_t Ypitch,
-                              const uint8_t* pUplane, size_t Upitch,
-                              const uint8_t* pVplane, size_t Vpitch)
+void SDLWindow::displayPixels(const uint8_t* pRGB, size_t pitch)
 {
-    SDL_UpdateYUVTexture(module.sdl.pTexture, NULL,
-                         pYplane, Ypitch,
-                         pUplane, Upitch,
-                         pVplane, Vpitch);
+    SDL_UpdateTexture(module.sdl.pTexture, NULL, pRGB, (int)pitch);
 
     SDL_RenderCopy(module.sdl.pRenderer, module.sdl.pTexture, NULL, NULL);
 }
